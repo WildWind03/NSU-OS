@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <stdlib.h>
-#include <dos.h>
 
 #define EXIT_ERROR -1
 #define TIME_TO_SLEEP 2
