@@ -9,6 +9,33 @@
 #define EXIT_SUCCESS 0
 #define MAX_THREAD_COUNT 30
 #define MIN_THREAD_COUNT 1
+#define COUNT_OF_ITER 100000
+
+typedef struct InfoForThread {
+    int posOfThread;
+    int countOfThreads;
+    double particularSum;
+} InfoForThread;
+
+void* countSum(void *arg) {
+    double sum = 0;
+
+    InfoForThread *infoForThread = (InfoForThread*) arg;
+
+    for (int k = 0; k < COUNT_OF_ITER; ++k) {
+        double sign = 1.0;
+        if (0 != infoForThread -> posOfThread%2) {
+            sign = -1.0;
+        }
+
+        sum += sign / ((2 * infoForThread -> posOfThread)+ 1);
+        infoForThread -> posOfThread+=infoForThread -> countOfThreads;
+    }
+
+    infoForThread -> particularSum = sum;
+
+    pthread_exit(infoForThread);
+}
 
 bool isNumber(char *str) {
     for (int k = 0; k < strlen(str); ++k) {
@@ -37,5 +64,31 @@ int main(int argc, char* argv[]) {
         perror("Invalid count of threads");
     }
 
+    InfoForThread *infoForThread = (InfoForThread*) malloc (sizeof(InfoForThread) * numOfThreads);
+    pthread_t* threads = (pthread_t*) malloc (sizeof(pthread_t) * numOfThreads);
 
+    for (int k = 0; k < numOfThreads; ++k) {
+        infoForThread[k].countOfThreads = numOfThreads;
+        infoForThread[k].posOfThread = k;
+        int resultOfThreadCreating = pthread_create(&threads[k], NULL, countSum, &infoForThread[k]);
+
+        if (0 != resultOfThreadCreating) {
+            perror("Can not create new thread");
+        }
+    }
+
+    for (int k = 0; k < numOfThreads; ++k) {
+        pthread_join(threads[k], NULL);
+    }
+
+    double sumOfParticularSums = 0;
+
+    for (int k = 0; k < numOfThreads; ++k) {
+        sumOfParticularSums+=infoForThread[k].particularSum;
+    }
+
+    printf("%f\n", sumOfParticularSums * 4);
+
+       free(infoForThread);
+       free(threads);
 }
