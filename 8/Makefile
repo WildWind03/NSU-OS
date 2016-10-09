@@ -1,2 +1,2 @@
 all:
-	gcc main.c -lpthread -std=c99 -o first.out
+	g++ main.c -lpthread -pthread -o first.out
