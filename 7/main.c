@@ -35,6 +35,8 @@ void* countSum(void *arg) {
     infoForThread -> particularSum = sum;
 
     pthread_exit(infoForThread);
+
+    //pthread_exit((void*)infoForThread -> particularSum);
 }
 
 bool isNumber(char *str) {
@@ -62,6 +64,7 @@ int main(int argc, char* argv[]) {
 
     if (numOfThreads < MIN_THREAD_COUNT || numOfThreads > MAX_THREAD_COUNT) {
         perror("Invalid count of threads");
+        exit(EXIT_FAILURE);
     }
 
     InfoForThread *infoForThread = (InfoForThread*) malloc (sizeof(InfoForThread) * numOfThreads);
@@ -78,8 +81,16 @@ int main(int argc, char* argv[]) {
     }
 
     for (int k = 0; k < numOfThreads; ++k) {
-        pthread_join(threads[k], NULL);
+        pthread_join(threads[k], ((void*) (infoForThread + k)));
     }
+
+    /*double sumOfParticularSums = 0;
+    for (int k = 0; k < numOfThreads; ++k) {
+        double result;
+        pthread_join(threads[k], &result);
+        sumOfParticularSums+=result;
+    }
+    */
 
     double sumOfParticularSums = 0;
 
@@ -87,7 +98,7 @@ int main(int argc, char* argv[]) {
         sumOfParticularSums+=infoForThread[k].particularSum;
     }
 
-    printf("%f\n", sumOfParticularSums * 4);
+    printf("%.10f\n", sumOfParticularSums * 4);
 
        free(infoForThread);
        free(threads);

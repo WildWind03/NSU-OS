@@ -1,9 +1,15 @@
+#include <signal.h>
 #include <stdio.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <signal.h>
+#include <unistd.h>
+
+#include <inttypes.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
 #define CORRECT_NUMBER_OF_ARGS 2
 #define EXIT_FAILURE 1
@@ -19,18 +25,31 @@ typedef struct InfoForThread {
 } InfoForThread;
 
 bool isStop = false;
+int maxIterCounts = 0;
+int countOfThreads = 0;
+pthread_mutex_t myMutex;
+pthread_cond_t myCond;
+pthread_mutex_t waitCondMutex;
+
 
 void stopCalculating(int signalNum) {
     isStop = true;
-
 }
 
 void* countSum(void *arg) {
+    sigset_t mySigset;
+    sigemptyset(&mySigset);
+    sigaddset(&mySigset, SIGINT);
+
+    pthread_sigmask(SIG_BLOCK, &mySigset, NULL);
+
     double sum = 0;
 
     InfoForThread *infoForThread = (InfoForThread*) arg;
 
-    for (int k = 0; k < COUNT_OF_ITER || !isStop; ++k) {
+
+    int k;
+    for (k = 0; k < COUNT_OF_ITER || !isStop; ++k) {
         double sign = 1.0;
         if (0 != infoForThread -> posOfThread%2) {
             sign = -1.0;
@@ -38,6 +57,36 @@ void* countSum(void *arg) {
 
         sum += sign / ((2 * infoForThread -> posOfThread)+ 1);
         infoForThread -> posOfThread+=infoForThread -> countOfThreads;
+    }
+
+    if (isStop) {
+        pthread_mutex_lock(&myMutex);
+        if (maxIterCounts < k) {
+            maxIterCounts = k;
+        }
+
+        countOfThreads++;
+
+        if (countOfThreads == infoForThread -> countOfThreads) {
+            pthread_cond_broadcast(&myCond);
+        } else {
+            pthread_cond_wait(&myCond, &myMutex);
+        }
+
+        pthread_mutex_unlock(&myMutex);
+
+        for ( ; k < maxIterCounts; ++k) {
+            double sign = 1.0;
+
+            if (0 != infoForThread -> posOfThread%2) {
+                sign = -1.0;
+            }
+
+            sum += sign / ((2 * infoForThread -> posOfThread)+ 1);
+            infoForThread -> posOfThread+=infoForThread -> countOfThreads;
+        }
+
+
     }
 
     infoForThread -> particularSum = sum;
@@ -73,6 +122,10 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    pthread_mutex_init(&myMutex, NULL);
+    pthread_mutex_init(&waitCondMutex, NULL);
+    pthread_cond_init(&myCond, NULL);
+
     signal(SIGINT, stopCalculating);
 
     InfoForThread *infoForThread = (InfoForThread*) malloc (sizeof(InfoForThread) * numOfThreads);
@@ -91,6 +144,10 @@ int main(int argc, char* argv[]) {
     for (int k = 0; k < numOfThreads; ++k) {
         pthread_join(threads[k], NULL);
     }
+
+    pthread_mutex_destroy(&myMutex);
+    pthread_mutex_destroy(&waitCondMutex);
+    pthread_cond_destroy(&myCond);
 
     double sumOfParticularSums = 0;
 

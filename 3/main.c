@@ -4,30 +4,54 @@
 
 #define COUNT_OF_THREADS 4
 #define ERROR_EXIT -1
+#define COUNT_OF_LINES 4
+#define LENGTH_OF_LINE 256
 
 void* printMessage(void *arg) {
-	printf ("%s\n", (char*) arg);
+    char **strings = (char**) arg;
+
+    for (int k = 0; k < COUNT_OF_LINES; ++k) {
+      	printf ("%s\n", strings[k]);
+      	free(strings[k]);
+    }
+
+    free(strings);
+
 	pthread_exit(NULL);
 }
 
 int main() {
 	pthread_t thread[COUNT_OF_THREADS];
-	char threadMessages[4][128] = {"Thread 1", "Thread 2", "Thread 3", "Thread 4"};
-	
-	int i;
-	for (i = 0; i < COUNT_OF_THREADS; ++i) {
-		int resultOfThreadCreation = pthread_create(&thread[i], NULL, printMessage, (void*) &threadMessages[i]);
-		
+	char ***messageSequence = (char***) malloc(sizeof(char**) * COUNT_OF_THREADS);
+
+	for (int k = 0; k < COUNT_OF_THREADS; ++k) {
+        messageSequence[k] = (char**) malloc(sizeof(char*) * COUNT_OF_LINES);
+
+        for (int i = 0; i < COUNT_OF_LINES; ++i) {
+            messageSequence[k][i] = (char*) malloc (sizeof(char) * LENGTH_OF_LINE);
+        }
+	}
+
+	for (int k = 0; k < COUNT_OF_THREADS; ++k) {
+        for (int i = 0; i < COUNT_OF_LINES; ++i) {
+            sprintf(messageSequence[k][i], "Thread N %d", k);
+        }
+	}
+
+	for (int i = 0; i < COUNT_OF_THREADS; ++i) {
+		int resultOfThreadCreation = pthread_create(&thread[i], NULL, printMessage, (void*) messageSequence[i]);
+
 		if (0 != resultOfThreadCreation) {
 			perror ("Can't create new thread");
 			exit(ERROR_EXIT);
 		}
 	}
-	
-	int k;
-	for (k = 0; k < COUNT_OF_THREADS; ++k) {
-		pthread_join(thread[k], NULL);
-	}
-	
-	pthread_exit(NULL);
+
+    free(messageSequence);
+
+    for (int k = 0; k < COUNT_OF_THREADS; ++k) {
+       pthread_join(thread[k], NULL);
+   }
+
+	exit(EXIT_SUCCESS);
 }
