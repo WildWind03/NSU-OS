@@ -6,6 +6,7 @@
 
 #define MAX_LENGTH_OF_STRING 80
 #define ALLOCATE_ERROR -1
+#define EMPTY_LIST_ERROR -2
 
 typedef struct node {
   node *next;
@@ -19,16 +20,31 @@ typedef struct list {
 } List;
 
 int initList(List *list) {
-  list = (List*) malloc (sizeof(List));
   list -> size = 0;
   return pthread_mutex_init(&list -> mutex, NULL);
 }
 
-int destroyList(List *list) {
-  for (int k = 0; k < size; ++k) {
+int deleteLast(List *list) {
+  if (list -> size > 0) {
+    Node *lastNode = list -> lastNode;
+    Node *newLastNode = lastNode -> next;
 
+    free (lastNode -> text);
+    free (lastNode);
+
+    list -> lastNode = newLastNode;
+    list -> size--;
+    return 0;
+  } else {
+    return EMPTY_LIST_ERROR;
   }
-  
+}
+
+
+int destroyList(List *list) {
+  while (EMPTY_LIST_ERROR != deleteLast(list)) {
+  }
+
   return pthread_mutex_destroy(&list -> mutex);
 }
 
@@ -43,16 +59,18 @@ int add_(List *list, char *text, int start, int end){
     end = length;
   }
 
-  node -> text = (char*) malloc (sizeof(char) * (end - start));
+  node -> text = (char*) malloc (sizeof(char) * (end - start + 1));
   strncpy(node -> text, text + start, end - start);
+  (node -> text)[end - start] = '\0';
 
   node -> next = list -> lastNode;
   list -> lastNode = node;
+  list -> size++;
 
   return 0;
 }
 
-int add(List *list, char *text) {
+int addToList(List *list, char *text) {
   pthread_mutex_lock(&list -> mutex);
 
   int length = strlen(text);
@@ -70,6 +88,29 @@ int add(List *list, char *text) {
   return result;
 }
 
+bool isLeftBigger(char *textLeft, char *textRight) {
+    int leftLength = strlen(textLeft);
+    int rightLength = strlen(textRight);
+
+    int minLength = leftLength > rightLength ? rightLength : leftLength;
+
+    for (int k = 0; k < minLength; ++k) {
+      if (textLeft[k] > textRight[k]) {
+        return true;
+      } else {
+        if (textLeft[k] < textRight[k]) {
+          return false;
+        }
+      }
+    }
+
+    if (leftLength > rightLength) {
+      return true;
+    }
+
+    return false;
+}
+
 int bubbleSort(List *list) {
   pthread_mutex_lock(&list -> mutex);
 
@@ -80,7 +121,7 @@ int bubbleSort(List *list) {
     for (int i = 0; i < list -> size - 1 - k; ++i) {
       Node *rightNode = leftNode -> next;
 
-      if ((leftNode -> text)[0] > (rightNode -> text)[0]) {
+      if (isLeftBigger(leftNode -> text, rightNode -> text)) {
         char *bufferText = rightNode -> text;
         rightNode -> text = leftNode -> text;
         leftNode -> text = bufferText;
