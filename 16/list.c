@@ -19,9 +19,11 @@ typedef struct list {
   size_t size;
 } List;
 
-int initList(List *list) {
+List* createList() {
+  List* list = (List*) malloc (sizeof(List));
   list -> size = 0;
-  return pthread_mutex_init(&list -> mutex, NULL);
+  pthread_mutex_init(&list -> mutex, NULL);
+  return list;
 }
 
 int deleteLast(List *list) {
@@ -41,11 +43,13 @@ int deleteLast(List *list) {
 }
 
 
-int destroyList(List *list) {
+void destroyList(List *list) {
   while (EMPTY_LIST_ERROR != deleteLast(list)) {
   }
 
-  return pthread_mutex_destroy(&list -> mutex);
+  pthread_mutex_destroy(&list -> mutex);
+
+  free(list);
 }
 
 int add_(List *list, char *text, int start, int end){
@@ -89,6 +93,12 @@ int addToList(List *list, char *text) {
 }
 
 bool isLeftBigger(char *textLeft, char *textRight) {
+  /*if (strcmp(textLeft, textRight) > 0) {
+    return true;
+  }
+  */
+
+  //return false;
     int leftLength = strlen(textLeft);
     int rightLength = strlen(textRight);
 
@@ -112,6 +122,10 @@ bool isLeftBigger(char *textLeft, char *textRight) {
 }
 
 int bubbleSort(List *list) {
+  if (0 == list -> size) {
+    return 0;
+  }
+
   pthread_mutex_lock(&list -> mutex);
 
   for (int k = 0; k < list -> size - 1; ++k) {
