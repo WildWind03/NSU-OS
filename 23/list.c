@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <semaphore.h>
 
 #define SEM_FOR_THREADS 0
 
@@ -27,28 +28,23 @@ typedef struct queue {
   sem_t busySem;
   sem_t sem;
   size_t size;
+  bool isDestroyed;
 } queue;
 
 void mymsginit(queue *myqueue) {
-  myqueue = (queue*) malloc (sizeof(queue));
   myqueue -> size = 0;
   sem_init(&myqueue -> sem, SEM_FOR_THREADS, 1);
   sem_init(&myqueue -> freeSem, SEM_FOR_THREADS, MAX_SIZE);
   sem_init(&myqueue -> busySem, SEM_FOR_THREADS, 0);
-  lastNode = NULL;
-  firstNode = NULL:
+  myqueue -> lastNode = NULL;
+  myqueue -> firstNode = NULL;
+  myqueue -> isDestroyed = false;
 }
 
-void mymsgdestroy(queue *myqueue) {
-    sem_wait(&myqueue -> sem);
-
-    while(myqueue -> size > 0) {
-      mymsgpop(myqueue);
-    }
-
-    sem_destroy(&myqueue -> sem);
-    sem_destroy(&myqueue -> freeSem);
-    sem_destroy(&myqueue -> busySem);
+void mymsgdrop(queue *myqueue) {
+    myqueue -> isDestroyed = true;
+    sem_post(&myqueue -> freeSem);
+    sem_post(&myqueue -> busySem);
 }
 
 void mymsgpop(queue *myqueue) {
@@ -74,18 +70,40 @@ void mymsgpop(queue *myqueue) {
 
   myqueue -> firstNode = secondNode;
   --myqueue -> size;
+}
 
+void mymsgdestroy(queue *myqueue) {
+    mymsgdrop(myqueue);
+
+    while(myqueue -> size > 0) {
+      mymsgpop(myqueue);
+    }
+
+    sem_destroy(&myqueue -> sem);
+    sem_destroy(&myqueue -> freeSem);
+    sem_destroy(&myqueue -> busySem);
 }
 
 int mymsgget(queue *myqueue, char *buf, size_t bufsize) {
+  if (myqueue -> isDestroyed) {
+    return 0;
+  }
+
   sem_wait(&myqueue -> busySem);
   sem_wait(&myqueue -> sem);
 
-  Node *firstNode = firstNode;
+  if (myqueue -> isDestroyed) {
+    sem_post(&myqueue -> busySem);
+    sem_post(&myqueue -> freeSem);
+    return 0;
+  }
+
+  Node *firstNode = myqueue -> firstNode;
   Node *secondNode = firstNode -> prev;
 
-  strncpy(firstNode -> text, buf, bufsize - 1);
+  strncpy(buf, firstNode -> text, bufsize - 1);
   buf[bufsize - 1] = '\0';
+
 
   free(firstNode -> text);
   free(firstNode);
@@ -94,18 +112,29 @@ int mymsgget(queue *myqueue, char *buf, size_t bufsize) {
   --myqueue -> size;
 
   if (0 == myqueue -> size) {
-    myqueue -> lastNode = NULL:
+    myqueue -> lastNode = NULL;
   }
 
   sem_post(&myqueue -> sem);
   sem_post(&myqueue -> freeSem);
 
+
   return strlen(buf) + 1;
 }
 
 int mymsgput(queue *myqueue, char *text) {
+  if (myqueue -> isDestroyed) {
+    return 0;
+  }
+
   sem_wait(&myqueue -> freeSem);
   sem_wait(&myqueue -> sem);
+
+  if (myqueue -> isDestroyed) {
+    sem_post(&myqueue -> freeSem);
+    sem_post(&myqueue -> sem);
+    return 0;
+  }
 
   int length = strlen(text);
 
@@ -116,13 +145,13 @@ int mymsgput(queue *myqueue, char *text) {
   Node *newNode = (Node*) malloc(sizeof(Node));
   newNode -> text = (char*) malloc (sizeof(char) * MAX_LENGTH_OF_STRING);
 
-  strncpy(text, newNode -> text, length - 1);
-  newNode -> text[length - 1] = "\0";
+  strncpy(newNode -> text, text, length);
+  newNode -> text[length] = '\0';
 
   if (myqueue -> size > 0) {
     myqueue -> lastNode -> prev = newNode;
-    newNode -> next = myQueue -> lastNode;
-    newNode -> prev = NULL:
+    newNode -> next = myqueue -> lastNode;
+    newNode -> prev = NULL;
     myqueue -> lastNode = newNode;
   } else {
     myqueue -> lastNode = newNode;
@@ -134,5 +163,5 @@ int mymsgput(queue *myqueue, char *text) {
   sem_post(&myqueue -> sem);
   sem_post(&myqueue -> busySem);
 
-  return length;
+  return length + 1;
 }
