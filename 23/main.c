@@ -8,6 +8,7 @@
 #include <semaphore.h>
 
 queue myqueue;
+queue secondqueue;
 
 void* work1(void *arg) {
     for (int k = 0; k < 10; ++k) {
@@ -41,8 +42,15 @@ void* work4(void *arg) {
   }
 }
 
+void* drop(void* arg) {
+    usleep(2000000);
+    queue *myqueue = (queue*) arg;
+    mymsgdrop(myqueue);
+}
+
 int main() {
-  mymsginit(&myqueue);
+  //mymsginit(&myqueue);
+  /*
   pthread_t pthread1, pthread2, pthread3, pthread4;
 
   pthread_create (&pthread1, NULL, work1, NULL);
@@ -55,5 +63,35 @@ int main() {
   pthread_join(pthread3, NULL);
   pthread_join(pthread4, NULL);
   mymsgdestroy(&myqueue);
+  */
+
+  pthread_t mythread;
+  pthread_create(&mythread, NULL, drop, &myqueue);
+  mymsginit(&myqueue);
+  char buffer[20];
+  int result = mymsgget(&myqueue, buffer, 20);
+  printf ("Result of interrupted get: %d\n", result);
+
+  int result1 = mymsgput(&myqueue, "Ha");
+  printf ("Result after interrupted get: %d\n", result1);
+
+
+  pthread_t mythread1;
+  pthread_create(&mythread1, NULL, drop, &secondqueue);
+  mymsginit(&secondqueue);
+  mymsgput(&secondqueue, "Tread 2 wrote");
+  mymsgput(&secondqueue, "Tread 2 wrote");
+  mymsgput(&secondqueue, "Tread 2 wrote");
+  mymsgput(&secondqueue, "Tread 2 wrote");
+  mymsgput(&secondqueue, "Tread 2 wrote");
+  mymsgput(&secondqueue, "Tread 2 wrote");
+  mymsgput(&secondqueue, "Tread 2 wrote");
+  mymsgput(&secondqueue, "Tread 2 wrote");
+  mymsgput(&secondqueue, "Tread 2 wrote");
+  mymsgput(&secondqueue, "Tread 2 wrote");
+  result = mymsgput(&secondqueue, "Tread 2 wrote");
+
+  printf ("Result of interrupted put: %d\n", result);
+
   return 0;
 }
